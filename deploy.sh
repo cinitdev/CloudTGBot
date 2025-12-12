@@ -43,10 +43,10 @@ deploy_from_zip() {
 
     echo -e "${BLUE}➜ 目标路径: ${target_dir}${PLAIN}"
 
-    # 1. 安装基础依赖 (新增 python3)
+    # 1. 安装基础依赖
     echo -e "${BLUE}[1/5] 检查并安装环境依赖...${PLAIN}"
-    apt update
-    apt install -y wget unzip python3
+    apt update -y
+    apt install wget python3 file p7zip-full -y
 
     # 2. 清理与创建目录
     if [ -d "$target_dir" ]; then
@@ -58,10 +58,22 @@ deploy_from_zip() {
     # 3. 下载文件
     echo -e "${BLUE}[3/5] 正在下载源码包...${PLAIN}"
     local zip_file="$target_dir/source.zip"
-    wget -O "$zip_file" "$url" --no-check-certificate
+    
+    # 增加超时参数，防止卡死
+    wget --no-check-certificate -T 30 -t 3 -O "$zip_file" "$url"
 
     if [ ! -f "$zip_file" ]; then
         echo -e "${RED}❌ 下载失败，请检查链接是否正确！${PLAIN}"
+        return 1
+    fi
+
+    # 检查文件类型 (防止下载成 404 网页)
+    file_type=$(file -b --mime-type "$zip_file")
+    if [[ "$file_type" != "application/zip" ]]; then
+        echo -e "${RED}❌ 下载错误！${PLAIN}"
+        echo -e "${YELLOW}下载到的不是 ZIP 包，而是: $file_type${PLAIN}"
+        echo -e "可能原因：GitHub 链接不正确 (404 网页) 或 URL 包含特殊字符未转义。"
+        rm -f "$zip_file"
         return 1
     fi
 
@@ -70,11 +82,15 @@ deploy_from_zip() {
     local zip_pass=""
 
     while true; do
-        echo -n "🔒 请输入 ZIP 压缩包密码 (输入不显示): "
-        read -s zip_pass
+        read -p "🔒 请输入 ZIP 压缩包密码: " -r zip_pass
         echo ""
 
-        if unzip -P "$zip_pass" -tq "$zip_file" >/dev/null 2>&1; then
+        if [[ -z "$zip_pass" ]]; then
+            echo -e "${RED}❌ 密码不能为空！${PLAIN}"
+            continue
+        fi
+        
+        if 7z t -p"$zip_pass" -y "$zip_file" >/dev/null 2>&1; then
             echo -e "${GREEN}✅ 密码正确，开始解压...${PLAIN}"
             break
         else
@@ -82,9 +98,9 @@ deploy_from_zip() {
         fi
     done
 
-    unzip -P "$zip_pass" -o "$zip_file" -d "$target_dir" >/dev/null 2>&1
+    7z x -p"$zip_pass" -y -o"$target_dir" "$zip_file" >/dev/null 2>&1
     if [ $? -ne 0 ]; then
-        echo -e "${RED}❌ 解压失败。${PLAIN}"
+        echo -e "${RED}❌ 解压失败，请检查文件完整性。${PLAIN}"
         rm -f "$zip_file"
         return 1
     fi
@@ -107,7 +123,6 @@ deploy_from_zip() {
         echo -e "${YELLOW}>>> 转交控制权给 install.py ...${PLAIN}"
         echo ""
         cd "$target_dir"
-        # 直接使用 python3 运行 install.py install
         python3 install.py install
     else
         echo -e "${RED}❌ 错误：压缩包内未找到 install.py！${PLAIN}"
