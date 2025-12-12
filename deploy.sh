@@ -48,12 +48,14 @@ deploy_from_zip() {
     apt update -y
     apt install wget python3 file p7zip-full -y
 
-    # 2. 清理与创建目录
-    if [ -d "$target_dir" ]; then
-        echo -e "${YELLOW}[2/5] 检测到旧目录，正在清理...${PLAIN}"
-        rm -rf "$target_dir"
+    # 2. 准备目录
+    if [ ! -d "$target_dir" ]; then
+        echo -e "${BLUE}[2/5] 创建安装目录...${PLAIN}"
+        mkdir -p "$target_dir"
+    else
+        echo -e "${YELLOW}[2/5] 检测到目录已存在，将直接覆盖更新文件...${PLAIN}"
     fi
-    mkdir -p "$target_dir"
+
 
     # 3. 下载文件
     echo -e "${BLUE}[3/5] 正在下载源码包...${PLAIN}"
