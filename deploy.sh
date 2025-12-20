@@ -151,7 +151,7 @@ show_menu() {
         1)
             DIR="/root/TG_ShuaTie"
             NAME="Telegram 频道浏览监控Bot"
-            URL="https://raw.githubusercontent.com/cinitdev/CloudTGBot/refs/heads/master/协议号浏览频道/bot.zip"
+            URL="https://raw.githubusercontent.com/cinitdev/CloudTGBot/master/协议号浏览频道/bot.zip"
             deploy_from_zip "$DIR" "$NAME" "$URL"
             ;;
         2)
