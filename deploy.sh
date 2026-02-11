@@ -142,7 +142,8 @@ show_menu() {
     echo -e "${GREEN}       Telegram Bot 集群部署管理器           ${PLAIN}"
     echo -e "${GREEN}=============================================${PLAIN}"
     echo -e "1. 部署 [Telegram 频道浏览监控Bot]"
-    echo -e "2. 部署 [其他 Bot] (示例)"
+    echo -e "2. 部署 [Telegram 多账号转发管理Bot]"
+    echo -e "3. 部署 [其他 Bot] (示例)"
     echo -e "0. 退出脚本"
     echo -e "${GREEN}=============================================${PLAIN}"
     read -p "请输入数字选择: " choice
@@ -151,10 +152,17 @@ show_menu() {
         1)
             DIR="/root/TG_ShuaTie"
             NAME="Telegram 频道浏览监控Bot"
-            URL="https://raw.githubusercontent.com/cinitdev/CloudTGBot/master/协议号浏览频道/bot.zip"
+            URL="https://raw.githubusercontent.com/cinitdev/CloudTGBot/master/%E5%8D%8F%E8%AE%AE%E5%8F%B7%E6%B5%8F%E8%A7%88%E9%A2%91%E9%81%93/bot.zip"
             deploy_from_zip "$DIR" "$NAME" "$URL"
             ;;
         2)
+            DIR="/root/TGmulti-Forward"
+            NAME="Telegram 多账号转发管理Bot"
+            URL="https://raw.githubusercontent.com/cinitdev/CloudTGBot/master/%E5%A4%9A%E8%B4%A6%E5%8F%B7%E8%BD%AC%E5%8F%91%E7%AE%A1%E7%90%86/multi-forward.zip"
+
+            deploy_from_zip "$DIR" "$NAME" "$URL"
+            ;;
+        3)
             DIR="/opt/Other_Bot"
             NAME="示例机器人"
             URL="https://example.com/other.zip"
