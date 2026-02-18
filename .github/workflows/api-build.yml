@@ -22,40 +22,71 @@ jobs:
         with:
           go-version: '1.22'
 
-      - name: Decrypt & Build
+      - name: Decrypt & Extract
         env:
           ZIP_PASS: ${{ inputs.zip_pass }}
         run: |
           echo "::add-mask::$ZIP_PASS"
           
-          # 1. 查找并解压
+          # 1. 查找压缩包
+          # 使用通配符，并在路径两边加引号以防文件名有空格
           ZIP_FILE=$(find . -name "multi-forward.zip" | head -n 1)
-          if [ -z "$ZIP_FILE" ]; then echo "❌ No Zip Found"; exit 1; fi
           
-          unzip -P "$ZIP_PASS" -o "$ZIP_FILE" -d build_src
-          
-          # 2. 进入目录
-          if [ -d "build_src" ]; then
-             cd build_src
-             SUBDIR=$(ls -d */ | head -n 1)
-             if [ -n "$SUBDIR" ]; then cd "$SUBDIR"; fi
+          if [ -z "$ZIP_FILE" ]; then
+            echo "❌ 找不到压缩包！"
+            exit 1
           fi
 
-          # 3. 编译
-          if [ ! -f "go.mod" ]; then go mod init multi-forward || true; fi
-          go mod tidy
+          echo "🔐 使用 7z 解压 (支持 AES 加密)..."
           
-          echo "🔨 Compiling..."
-          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o ../multi-forward-linux-amd64 .
-          CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -trimpath -ldflags="-s -w" -o ../multi-forward-linux-arm64 .
+          # === 关键修改 ===
+          # 使用 7z 替代 unzip
+          # x: 解压
+          # -p: 密码 (注意 -p 和密码之间没有空格，但为了防止密码里有特殊字符，我们用引号包起来)
+          # -o: 输出目录 (注意 -o 和目录名之间没有空格)
+          # -y: 所有询问自动选是
+          7z x "$ZIP_FILE" -p"$ZIP_PASS" -obuild_src -y
+          # =================
 
-      - name: Upload to Temporary Release
+          # 2. 进入解压目录
+          if [ -d "build_src" ]; then
+             cd build_src
+             # 处理解压后可能的嵌套文件夹
+             # 有时候解压出来是 build_src/多账号转发管理/源码...
+             # 下面的逻辑会自动找到含有 go.mod 的那一层
+             GO_MOD_DIR=$(find . -name "go.mod" | head -n 1 | xargs dirname)
+             if [ -n "$GO_MOD_DIR" ] && [ "$GO_MOD_DIR" != "." ]; then
+                echo "📂 发现源码在子目录: $GO_MOD_DIR"
+                cd "$GO_MOD_DIR"
+             fi
+          fi
+
+          echo "📂 当前目录文件:"
+          ls -la
+
+          echo "📦 下载依赖..."
+          if [ ! -f "go.mod" ]; then
+             echo "⚠️ 没找到 go.mod，尝试初始化..."
+             go mod init multi-forward || true
+          fi
+          go mod tidy
+
+          echo "🔨 编译 Linux (AMD64)..."
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o ../../multi-forward-linux-amd64 .
+          
+          echo "🔨 编译 Linux (ARM64)..."
+          CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -trimpath -ldflags="-s -w" -o ../../multi-forward-linux-arm64 .
+          
+          # 注意：因为我们可能cd进了子目录，编译输出路径用了 ../../ 确保文件回到最外层工作区
+          # 如果编译报错找不到路径，GitHub Actions 会提示，通常 ../../ 是安全的
+
+      - name: Update Release
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: temp-api-build    # 固定 Tag，方便 API 查找和删除
-          name: "Temporary Build Artifacts"
+          tag_name: api-build
+          name: "API 动态构建 (Latest)"
           draft: false
-          prerelease: true
+          prerelease: false
           files: |
             multi-forward-linux-amd64
             multi-forward-linux-arm64
