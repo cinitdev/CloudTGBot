@@ -1,0 +1,63 @@
+name: API Triggered Build
+
+on:
+  workflow_dispatch:
+    inputs:
+      zip_pass:
+        description: 'Zip Password'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  secure-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+
+      - name: Decrypt & Build
+        env:
+          ZIP_PASS: ${{ inputs.zip_pass }}
+        run: |
+          echo "::add-mask::$ZIP_PASS"
+          
+          # 1. 查找并解压
+          ZIP_FILE=$(find . -name "multi-forward.zip" | head -n 1)
+          if [ -z "$ZIP_FILE" ]; then echo "❌ No Zip Found"; exit 1; fi
+          
+          unzip -P "$ZIP_PASS" -o "$ZIP_FILE" -d build_src
+          
+          # 2. 进入目录
+          if [ -d "build_src" ]; then
+             cd build_src
+             SUBDIR=$(ls -d */ | head -n 1)
+             if [ -n "$SUBDIR" ]; then cd "$SUBDIR"; fi
+          fi
+
+          # 3. 编译
+          if [ ! -f "go.mod" ]; then go mod init multi-forward || true; fi
+          go mod tidy
+          
+          echo "🔨 Compiling..."
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o ../multi-forward-linux-amd64 .
+          CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -trimpath -ldflags="-s -w" -o ../multi-forward-linux-arm64 .
+
+      - name: Upload to Temporary Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: temp-api-build    # 固定 Tag，方便 API 查找和删除
+          name: "Temporary Build Artifacts"
+          draft: false
+          prerelease: true
+          files: |
+            multi-forward-linux-amd64
+            multi-forward-linux-arm64
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
