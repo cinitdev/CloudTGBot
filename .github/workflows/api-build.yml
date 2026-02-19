@@ -27,7 +27,9 @@ jobs:
           check-latest: true
 
       - name: Mask Secrets
-        run: echo "::add-mask::${{ inputs.zip_pass }}"
+        run: |
+          SECRET_PASS=$(jq -r '.inputs.zip_pass' "$GITHUB_EVENT_PATH")
+          echo "::add-mask::$SECRET_PASS"
 
       - name: Prepare Output Directory
         run: mkdir -p "$GITHUB_WORKSPACE/output"
@@ -45,7 +47,7 @@ jobs:
           echo "----------------------------------------"
           bash -e run_build.sh
           echo "----------------------------------------"
-          
+
       - name: Upload to Temporary Release
         uses: softprops/action-gh-release@v1
         with:
