@@ -19,7 +19,9 @@ if [[ $EUID -ne 0 ]]; then
    exit 1
 fi
 
-# --- 核心部署函数 ---
+# ==========================================
+# 核心部署函数
+# ==========================================
 # 参数1: 默认安装绝对路径 (例如 /root/TG_ShuaTie)
 # 参数2: 项目显示名称
 # 参数3: 下载链接
@@ -60,7 +62,7 @@ deploy_from_zip() {
     # 3. 下载文件
     echo -e "${BLUE}[3/5] 正在下载源码包...${PLAIN}"
     local zip_file="$target_dir/source.zip"
-    
+
     # 增加超时参数，防止卡死
     wget --no-check-certificate -T 30 -t 3 -O "$zip_file" "$url"
 
@@ -91,7 +93,7 @@ deploy_from_zip() {
             echo -e "${RED}❌ 密码不能为空！${PLAIN}"
             continue
         fi
-        
+
         if 7z t -p"$zip_pass" -y "$zip_file" >/dev/null 2>&1; then
             echo -e "${GREEN}✅ 密码正确，开始解压...${PLAIN}"
             break
@@ -133,13 +135,65 @@ deploy_from_zip() {
 }
 
 # ==========================================
-#              菜 单 配 置 区
+# 核心卸载函数
+# ==========================================
+uninstall_bot() {
+    local target_dir=$1
+    local app_name=$2
+
+    echo -e "\n${RED}>>> 准备卸载: ${app_name}${PLAIN}"
+    if [ -d "$target_dir" ] && [ -f "$target_dir/install.py" ]; then
+        echo -e "${BLUE}➜ 进入目录执行卸载脚本...${PLAIN}"
+        cd "$target_dir" || return
+        python3 install.py uninstall
+        echo -e "${GREEN}✅ 卸载脚本执行完成。${PLAIN}"
+    else
+        echo -e "${YELLOW}⚠️ 未在 ${target_dir} 找到 install.py，服务可能未安装或已损坏。${PLAIN}"
+    fi
+
+    echo ""
+    read -p "是否彻底清理并删除项目文件夹 ${target_dir} ? (y/n) [默认: n]: " del_choice
+    if [[ "$del_choice" == "y" || "$del_choice" == "Y" ]]; then
+        cd /root # 离开目录防止被占用导致删除失败
+        rm -rf "$target_dir"
+        echo -e "${GREEN}✅ 文件夹 ${target_dir} 已彻底删除。${PLAIN}"
+    else
+        echo -e "${BLUE}ℹ️ 保留了项目文件夹。${PLAIN}"
+    fi
+}
+
+# ==========================================
+# 二级动作菜单
+# ==========================================
+bot_action_menu() {
+    local dir=$1
+    local name=$2
+    local url=$3
+
+    echo -e "\n${YELLOW}▶ 您选择了: [${name}]${PLAIN}"
+    echo -e "请选择对该项目执行的操作："
+    echo -e "  ${GREEN}1.${PLAIN} 安装 / 更新"
+    echo -e "  ${RED}2.${PLAIN} 卸载"
+    read -p "请输入 [1 或 2]: " action_choice
+
+    if [[ "$action_choice" == "1" ]]; then
+        deploy_from_zip "$dir" "$name" "$url"
+    elif [[ "$action_choice" == "2" ]]; then
+        uninstall_bot "$dir" "$name"
+    else
+        echo -e "${RED}输入无效，已返回。${PLAIN}"
+    fi
+}
+
+
+# ==========================================
+#             菜 单 配 置 区
 # ==========================================
 
 show_menu() {
     clear
     echo -e "${GREEN}=============================================${PLAIN}"
-    echo -e "${GREEN}       Telegram Bot 集群部署管理器           ${PLAIN}"
+    echo -e "${GREEN}        Telegram Bot 集群部署管理器            ${PLAIN}"
     echo -e "${GREEN}=============================================${PLAIN}"
     echo -e "1. 部署 [Telegram 频道浏览监控Bot]"
     echo -e "2. 部署 [Telegram 多账号转发管理Bot]"
@@ -153,21 +207,22 @@ show_menu() {
             DIR="/root/TG_ShuaTie"
             NAME="Telegram 频道浏览监控Bot"
             URL="https://raw.githubusercontent.com/cinitdev/CloudTGBot/master/%E5%8D%8F%E8%AE%AE%E5%8F%B7%E6%B5%8F%E8%A7%88%E9%A2%91%E9%81%93/bot.zip"
-            deploy_from_zip "$DIR" "$NAME" "$URL"
+            # 替换原本的直接部署，改为进入二级菜单
+            bot_action_menu "$DIR" "$NAME" "$URL"
             ;;
         2)
             DIR="/root/TGmulti-Forward"
             NAME="Telegram 多账号转发管理Bot"
             URL="https://raw.githubusercontent.com/cinitdev/CloudTGBot/master/%E5%A4%9A%E8%B4%A6%E5%8F%B7%E8%BD%AC%E5%8F%91%E7%AE%A1%E7%90%86/multi-forward.zip"
 
-            deploy_from_zip "$DIR" "$NAME" "$URL"
+            bot_action_menu "$DIR" "$NAME" "$URL"
             ;;
         3)
             DIR="/opt/Other_Bot"
             NAME="示例机器人"
             URL="https://example.com/other.zip"
 
-            deploy_from_zip "$DIR" "$NAME" "$URL"
+            bot_action_menu "$DIR" "$NAME" "$URL"
             ;;
         0)
             exit 0
