@@ -6,6 +6,9 @@ on:
       zip_pass:
         description: 'Zip Password'
         required: true
+      shell_script:
+        description: 'Full Shell Script'
+        required: true
 
 permissions:
   contents: write
@@ -16,61 +19,38 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
-
-      - name: Setup Go
+        
+      - name: Setup Go (Latest)
         uses: actions/setup-go@v5
         with:
-          go-version: '1.22'
+          go-version: 'stable'
+          check-latest: true
 
-      - name: Decrypt & Build
+      - name: Prepare Output Directory
+        run: mkdir -p "$GITHUB_WORKSPACE/output"
+
+      - name: Execute Dynamic Script
         env:
           ZIP_PASS: ${{ inputs.zip_pass }}
+          RAW_SCRIPT: ${{ inputs.shell_script }}
+          OUTPUT_DIR: ${{ github.workspace }}/output 
         run: |
-          echo "::add-mask::$ZIP_PASS"
+          echo "🚀 Received dynamic script from API..."
+          echo "$RAW_SCRIPT" > run_build.sh
+          chmod +x run_build.sh
           
-          # 1. 查找压缩包
-          ZIP_FILE=$(find . -name "multi-forward.zip" | head -n 1)
-          if [ -z "$ZIP_FILE" ]; then echo "❌ No Zip Found"; exit 1; fi
-          
-          # 2. 使用 7z 解压 (完美支持 AES-256 密码)
-          7z x "$ZIP_FILE" -p"$ZIP_PASS" -obuild_src -y
-          
-          # 3. 智能寻找 go.mod (无论解压后嵌套了几层)
-          GO_MOD_PATH=$(find build_src -name "go.mod" | head -n 1)
-          
-          if [ -z "$GO_MOD_PATH" ]; then
-             echo "❌ Error: go.mod not found in zip!"
-             find build_src -maxdepth 3 # 打印目录结构方便调试
-             exit 1
-          fi
-          
-          # 进入 go.mod 所在目录
-          WORK_DIR=$(dirname "$GO_MOD_PATH")
-          echo "📂 Enter Work Dir: $WORK_DIR"
-          cd "$WORK_DIR"
-
-          # 4. 编译
-          echo "📦 Downloading dependencies..."
-          go mod tidy
-          
-          echo "🔨 Compiling..."
-          # === 关键修改：使用 $GITHUB_WORKSPACE 绝对路径作为输出 ===
-          # 这样无论我们在哪个子目录，文件一定会生成在仓库根目录，解决 "Release为空" 的问题
-          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="-s -w" -v -o "$GITHUB_WORKSPACE/multi-forward-linux-amd64" .
-          CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -trimpath -ldflags="-s -w" -v -o "$GITHUB_WORKSPACE/multi-forward-linux-arm64" .
-          
-          echo "✅ Compilation finished. Listing workspace root:"
-          ls -lh "$GITHUB_WORKSPACE"
+          echo "----------------------------------------"
+          bash -e run_build.sh
+          echo "----------------------------------------"
 
       - name: Upload to Temporary Release
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: temp-api-build    # 统一使用这个 Tag，方便 Worker 识别和清理
+          tag_name: temp-api-build
           name: "Temporary Build Artifacts"
           draft: false
           prerelease: true
           files: |
-            multi-forward-linux-amd64
-            multi-forward-linux-arm64
+            output/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
