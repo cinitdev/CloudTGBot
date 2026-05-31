@@ -207,21 +207,18 @@ show_menu() {
             DIR="/root/TG_ShuaTie"
             NAME="Telegram 频道浏览监控Bot"
             URL="https://raw.githubusercontent.com/cinitdev/CloudTGBot/master/%E5%8D%8F%E8%AE%AE%E5%8F%B7%E6%B5%8F%E8%A7%88%E9%A2%91%E9%81%93/bot.zip"
-            # 替换原本的直接部署，改为进入二级菜单
             bot_action_menu "$DIR" "$NAME" "$URL"
             ;;
         2)
             DIR="/root/TGmulti-Forward"
             NAME="Telegram 多账号转发管理Bot"
             URL="https://raw.githubusercontent.com/cinitdev/CloudTGBot/master/%E5%A4%9A%E8%B4%A6%E5%8F%B7%E8%BD%AC%E5%8F%91%E7%AE%A1%E7%90%86/multi-forward.zip"
-
             bot_action_menu "$DIR" "$NAME" "$URL"
             ;;
         3)
-            DIR="/opt/Other_Bot"
-            NAME="示例机器人"
-            URL="https://example.com/other.zip"
-
+            DIR="/root/TGmulti-Forward"
+            NAME="Telegram 多账号转发管理Bot"
+            URL="https://raw.githubusercontent.com/cinitdev/CloudTGBot/master/%E5%A4%9A%E8%B4%A6%E5%8F%B7%E8%BD%AC%E5%8F%91%E7%AE%A1%E7%90%86/multi-forward2.zip"
             bot_action_menu "$DIR" "$NAME" "$URL"
             ;;
         0)
