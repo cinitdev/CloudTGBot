@@ -1,0 +1,67 @@
+name: deploy
+
+on:
+  repository_dispatch:
+    types: [deploy, rollback, metrics]
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: deploy-${{ github.event.client_payload.job_id }}
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      JOB_ID: ${{ github.event.client_payload.job_id }}
+      EVENT_TYPE: ${{ github.event.action }}
+      WORKER_BASE: ${{ vars.WORKER_BASE }}
+      ACTIONS_HMAC_SECRET: ${{ secrets.ACTIONS_HMAC_SECRET }}
+      GH_RUN_ID: ${{ github.run_id }}
+
+    steps:
+      - name: Checkout helper scripts
+        uses: actions/checkout@v4
+
+      - name: Sanity check inputs
+        run: |
+          set -euo pipefail
+          : "${JOB_ID:?missing job_id}"
+          : "${WORKER_BASE:?missing WORKER_BASE var}"
+          : "${ACTIONS_HMAC_SECRET:?missing ACTIONS_HMAC_SECRET}"
+          echo "job=$JOB_ID event=$EVENT_TYPE"
+
+      - name: Install dependencies (jq, openssl, ssh, sshpass, unzip)
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends jq openssl openssh-client sshpass unzip curl > /dev/null
+
+      - name: Fetch job payload from Worker
+        id: fetch
+        run: bash .github/scripts/fetch_job.sh
+        # 输出文件 $RUNNER_TEMP/job.json，包含 ssh + r2_key + rendered_config 等
+
+      - name: Run deploy or rollback
+        id: run
+        env:
+          STEP_NAME: run
+        run: bash .github/scripts/run_job.sh
+        continue-on-error: true
+
+      - name: Report result
+        if: always()
+        env:
+          OUTCOME: ${{ steps.run.outcome }}
+        run: bash .github/scripts/report_result.sh
+
+      - name: Wipe secrets from runner
+        if: always()
+        run: |
+          shred -u "$RUNNER_TEMP/job.json" 2>/dev/null || true
+          shred -u "$RUNNER_TEMP/ssh_key" 2>/dev/null || true
+          rm -rf "$RUNNER_TEMP/pkg" || true
