@@ -216,9 +216,9 @@ show_menu() {
             bot_action_menu "$DIR" "$NAME" "$URL"
             ;;
         3)
-            DIR="/root/TGmulti-Forward"
-            NAME="Telegram 多账号转发管理Bot"
-            URL="https://raw.githubusercontent.com/cinitdev/CloudTGBot/master/%E5%A4%9A%E8%B4%A6%E5%8F%B7%E8%BD%AC%E5%8F%91%E7%AE%A1%E7%90%86/multi-forward2.zip"
+            DIR="/opt/Other_Bot"
+            NAME="示例机器人"
+            URL="https://example.com/other.zip"
             bot_action_menu "$DIR" "$NAME" "$URL"
             ;;
         0)
